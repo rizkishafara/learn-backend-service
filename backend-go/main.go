@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -53,13 +54,16 @@ func main() {
 		}
 		json.NewEncoder(w).Encode(products)
 	})
-	http.HandleFunc("/products/:id", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/products/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		id := r.URL.Query().Get("id")
-		if id == "" {
+
+		pathParts := strings.Split(r.URL.Path, "/")
+		if len(pathParts) < 3 || pathParts[2] == "" {
 			http.Error(w, "Missing product ID", http.StatusBadRequest)
 			return
 		}
+		id := pathParts[2]
+
 		var p Product
 		err := db.QueryRow("SELECT id, nama, harga FROM products WHERE id = ?", id).Scan(&p.ID, &p.Nama, &p.Harga)
 		if err == sql.ErrNoRows {
