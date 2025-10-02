@@ -1,4 +1,4 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 import mysql.connector
 import os
 
@@ -30,6 +30,82 @@ def products():
     cursor.close()
     conn.close()
     return jsonify(rows)
+
+
+@app.route("/products/<int:product_id>", methods=["GET"])
+def get_product(product_id):
+    conn = get_conn()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT id, nama, harga FROM products WHERE id = %s", (product_id,))
+    row = cursor.fetchone()
+    cursor.close()
+    conn.close()
+    if row:
+        return jsonify(row)
+    return jsonify({"error": "Product not found"}), 404
+
+
+@app.route("/products", methods=["POST"])
+def create_product():
+    data = request.get_json()
+    nama = data.get("nama")
+    harga = data.get("harga")
+
+    if not nama or harga is None:
+        return jsonify({"error": "nama and harga are required"}), 400
+
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO products (nama, harga) VALUES (%s, %s)", (nama, harga))
+    conn.commit()
+    new_id = cursor.lastrowid
+    cursor.close()
+    conn.close()
+
+    return jsonify({"id": new_id, "nama": nama, "harga": harga}), 201
+
+
+@app.route("/products/<int:product_id>", methods=["PUT"])
+def update_product(product_id):
+    data = request.get_json()
+    nama = data.get("nama")
+    harga = data.get("harga")
+
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id FROM products WHERE id = %s", (product_id,))
+    if not cursor.fetchone():
+        cursor.close()
+        conn.close()
+        return jsonify({"error": "Product not found"}), 404
+
+    cursor.execute(
+        "UPDATE products SET nama = %s, harga = %s WHERE id = %s",
+        (nama, harga, product_id),
+    )
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    return jsonify({"id": product_id, "nama": nama, "harga": harga})
+
+
+@app.route("/products/<int:product_id>", methods=["DELETE"])
+def delete_product(product_id):
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id FROM products WHERE id = %s", (product_id,))
+    if not cursor.fetchone():
+        cursor.close()
+        conn.close()
+        return jsonify({"error": "Product not found"}), 404
+
+    cursor.execute("DELETE FROM products WHERE id = %s", (product_id,))
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    return jsonify({"message": f"Product {product_id} deleted"})
 
 
 if __name__ == "__main__":
